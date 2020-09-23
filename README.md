@@ -69,8 +69,27 @@ http://lbd.arch.rwth-aachen.de/IFCtoB4R_OpenAPI/apidocs
 http://lbd.arch.rwth-aachen.de/IFCtoB4R_OpenAPI/apidocs/ui/swagger.json
 
 ## Changes
+- namespace fixes
 - IFCtoLBD was added. BOT+SMLS has a separate REST interface 
 - BIMserver integration is functional. Some beta testing is still needed.
+
+### Docker for the Open API interface
+
+Install Docker Desktop:  https://www.docker.com/get-started
+
+https://hub.docker.com/repository/docker/jyrkioraskari/ifc2b4r
+
+Command-line commands needed to start the server at your computer;
+```
+docker pull jyrkioraskari/ifc2b4r:latest
+
+docker container run -it --publish 8081:8080 jyrkioraskari/ifc2b4r
+
+
+```
+Then the software can be accessed from the local web address:
+http://localhost:8081/IFCtoB4R_OpenAPI
+
 
 ## How to cite
 ```
