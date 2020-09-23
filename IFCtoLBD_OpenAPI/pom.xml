@@ -7,7 +7,7 @@
 	<artifactId>IFCtoB4R_OpenAPI</artifactId>
 	<version>1.14</version>
 	<packaging>war</packaging>
-	<name>IFCtoLBD OpenAPI Interface</name>
+	<name>IFC to B4R-DM  OpenAPI Interface</name>
 
 	<developers>
 		<developer>
@@ -143,4 +143,5 @@
 			<type>pom</type>
 		</dependency>
 	</dependencies>
+	<description>An Restful OpenAPI implementation that converts an IFC Step file into Linked Building Data RDF defined in the B4R-DM ontology. The output is compatible with Building Topology Ontology defined in https://w3c-lbd-cg.github.io/bot/.</description>
 </project>

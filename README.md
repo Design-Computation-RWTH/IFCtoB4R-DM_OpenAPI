@@ -61,13 +61,12 @@ the geo:hasGeometry and geo:asWKT triples of GeoSPARQL 1.0 . The bounding box is
 the Well-Known Text format Multipoint.
 
 ## A test installation:
-http://lbd.arch.rwth-aachen.de/IFCtoLBD_OpenAPI/apidocs/
-
+http://lbd.arch.rwth-aachen.de/IFCtoB4R_OpenAPI/apidocs
 
 
 ## Swagger.json description for the services
 
-http://lbd.arch.rwth-aachen.de/IFCtoLBD_OpenAPI/apidocs/ui/swagger.json
+http://lbd.arch.rwth-aachen.de/IFCtoB4R_OpenAPI/apidocs/ui/swagger.json
 
 ## Changes
 - IFCtoLBD was added. BOT+SMLS has a separate REST interface 
