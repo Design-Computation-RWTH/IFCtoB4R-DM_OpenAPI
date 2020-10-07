@@ -36,7 +36,7 @@ public class Sample_IFCtoSMLS {
 	
 	public static void main(String[] args) {
 		//String ifcFileName = "c:\\test\\bim4ren\\BIM4Ren_DUNANT_cleaned_IFC2x3.ifc";
-		String ifcFileName = "C:\\temp\\rwth\\Dataset\\Reiff\\ChairCAAD.ifc";
+		String ifcFileName = "C:\\test\\bim4ren\\BIM4Ren_DUNANT_cleaned_IFC2x3.ifc";
 		File ifcFile = new File(ifcFileName);
 		StringBuilder result_string=new StringBuilder();
 		extractLBD_SMLS(ifcFile, result_string);

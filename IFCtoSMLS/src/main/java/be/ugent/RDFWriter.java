@@ -99,8 +99,7 @@ public class RDFWriter {
   }
 
   public void parseModel2Stream(OutputStream out) throws IOException {
-	//JO -->>> 
-    ttlWriter = StreamRDFWriter.getWriterStream(out, RDFFormat.TURTLE_FLAT, Context.emptyContext);
+    ttlWriter = StreamRDFWriter.getWriterStream(out, RDFFormat.TURTLE_FLAT);
     ttlWriter.base(baseURI);
     ttlWriter.prefix("ifc", ontNS);
     ttlWriter.prefix("inst", baseURI);

@@ -83,7 +83,7 @@ public class FileUtils {
 
 		        while ((fname = br.readLine()) != null) {
 					//System.out.println("JO lists ofile: "+fname);
-		            if (fname.startsWith("/" + dir)) {
+		            if (fname.contains("/" + dir)) {
 						if (fname.contains("_") && fname.endsWith(extension))
 						{
 							//System.out.println("JO adds ofile: "+fname);

@@ -4,7 +4,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -14,13 +15,12 @@ import java.util.stream.Collectors;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.rdf.model.Resource;
-import org.apache.jena.riot.Lang;
-import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.vocabulary.RDF;
+import org.lbd.ifc2lbd.application_messaging.events.IFCtoLBD_SystemStatusEvent;
 
-import de.rwth_aachen.dc.lbd_smls.IFCtoLBDConverter_BIM4Ren;
+import com.google.common.eventbus.EventBus;
+
 import de.rwth_aachen.dc.lbd_smls.utils.rdfpath.RDFStep;
-
 
 /*
  *  Copyright (c) 2017 Jyrki Oraskari (Jyrki.Oraskari@gmail.f)
@@ -42,24 +42,29 @@ public class RDFUtils {
 
 	/**
 	 * 
-	 * This method is used to write the Turtle formatted output files that are the result of of the conversion
-	 * process.
+	 * This method is used to write the Turtle formatted output files that are the
+	 * result of of the conversion process.
 	 * 
-	 * An utility method to export an Apache Jena RDF storage content into a Turtle formatted file- 
+	 * An utility method to export an Apache Jena RDF storage content into a Turtle
+	 * formatted file-
 	 * 
-	 * @param m an Apache Jena model
+	 * @param m           an Apache Jena model
 	 * @param target_file absolute path name for an output file
-	 
-	 * If no user interface is present, adding messages to the channel does nothing.
+	 * 
+	 *                    If no user interface is present, adding messages to the
+	 *                    channel does nothing.
 	 * 
 	 */
-	public static void writeModel(Model m, String target_file) {
-		FileOutputStream fo = null;
+	public static void writeModel(Model m, String target_file, EventBus eventBus) {
+		OutputStreamWriter fo = null;
 		try {
-			fo = new FileOutputStream(new File(target_file));
+			fo = new OutputStreamWriter(new FileOutputStream(new File(target_file)),
+					Charset.forName("UTF-8").newEncoder());
+
 			m.write(fo, "TTL");
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
+			eventBus.post(new IFCtoLBD_SystemStatusEvent("Error : " + e.getMessage()));
 		} finally {
 			if (fo != null)
 				try {
@@ -68,18 +73,13 @@ public class RDFUtils {
 				}
 		}
 	}
-	
-	
-	
-
-
 
 	/**
-	 * An utility method to copy of conected Abox triples unmodified from one Jena model to another.
-	 * This is used to copy ifcOWL property set data as is.
+	 * An utility method to copy of conected Abox triples unmodified from one Jena
+	 * model to another. This is used to copy ifcOWL property set data as is.
 	 * 
-	 * @param level  how many steps from the start node
-	 * @param r  A RDF node to start the copying
+	 * @param level        how many steps from the start node
+	 * @param r            A RDF node to start the copying
 	 * @param output_model A Jena model where the triples are copied to
 	 */
 	public static void copyTriples(int level, RDFNode r, Model output_model) {
@@ -99,9 +99,9 @@ public class RDFUtils {
 	/**
 	 * A helper method to find a list of nodes that match a given RDF path pattern
 	 * 
-	 * @param r      the starting point 
-	 * @param path   the path pattern
-	 * @return       the list of found noded at the RDF graoh
+	 * @param r    the starting point
+	 * @param path the path pattern
+	 * @return the list of found noded at the RDF graoh
 	 */
 	public static List<RDFNode> pathQuery(Resource r, RDFStep[] path) {
 		List<RDFStep> path_list = Arrays.asList(path);
@@ -122,14 +122,16 @@ public class RDFUtils {
 		}
 		return new ArrayList<RDFNode>();
 	}
-	
+
 	/**
-	 *  
-	 * Gives the corresponding RDF ontology class type of the RDF node in the Apache Jena RDF model. 
 	 * 
-	 * @param r  An RDF recource in a Apache Jena RDF store.
-	 * @return The ontology class Resource node as an optional, that is, if exists. An empty return is given,
-	 * if the triples does not exists at the graph. 
+	 * Gives the corresponding RDF ontology class type of the RDF node in the Apache
+	 * Jena RDF model.
+	 * 
+	 * @param r An RDF recource in a Apache Jena RDF store.
+	 * @return The ontology class Resource node as an optional, that is, if exists.
+	 *         An empty return is given, if the triples does not exists at the
+	 *         graph.
 	 */
 	public static Optional<Resource> getType(Resource r) {
 		RDFStep[] path = { new RDFStep(RDF.type) };

@@ -10,6 +10,9 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,6 +23,7 @@ import java.util.Set;
 
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.TypeMapper;
+import org.apache.jena.ontology.OntModel;
 import org.apache.jena.ontology.OntModelSpec;
 import org.apache.jena.rdf.model.Literal;
 import org.apache.jena.rdf.model.Model;
@@ -31,6 +35,7 @@ import org.apache.jena.rdf.model.ResourceFactory;
 import org.apache.jena.rdf.model.SimpleSelector;
 import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.StmtIterator;
+import org.apache.jena.reasoner.Reasoner;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.vocabulary.OWL;
@@ -42,6 +47,7 @@ import org.bimserver.plugins.renderengine.RenderEngineException;
 import com.openifctools.guidcompressor.GuidCompressor;
 
 import be.ugent.IfcSpfReader;
+import de.rwth_aachen.dc.lbd.BoundingBox;
 import de.rwth_aachen.dc.lbd.IFCBoundingBoxes;
 import de.rwth_aachen.dc.lbd_smls.geo.IFC_Geolocation;
 import de.rwth_aachen.dc.lbd_smls.geo.WktLiteral;
@@ -52,7 +58,7 @@ import de.rwth_aachen.dc.lbd_smls.utils.FileUtils;
 import de.rwth_aachen.dc.lbd_smls.utils.IfcOWLUtils;
 import de.rwth_aachen.dc.lbd_smls.utils.RDFUtils;
 import de.rwth_aachen.dc.lbd_smls.utils.rdfpath.RDFStep;
-import nl.tue.ddss.bcf.BoundingBox;
+import openllet.jena.PelletReasonerFactory;
 
 /*
  *  Copyright (c) 2017,2018,2019.2020 Jyrki Oraskari (Jyrki.Oraskari@gmail.f)
@@ -82,6 +88,7 @@ public class IFCtoLBDConverter_BIM4Ren {
 	private Model ontology_model = null;
 	private Map<String, List<Resource>> ifcowl_product_map;
 	private String uriBase;
+	private final OntModel  pelletModel;
 
 	private Optional<String> ontURI = Optional.empty();
 	private IfcOWLNameSpace ifcOWL;
@@ -91,6 +98,10 @@ public class IFCtoLBDConverter_BIM4Ren {
 
 	private Model lbd_general_output_model;
 	private IFCBoundingBoxes bounding_boxes = null;
+
+	public IFCtoLBDConverter_BIM4Ren() {
+		this.pelletModel =  ModelFactory.createOntologyModel(PelletReasonerFactory.THE_SPEC);
+	}
 
 	public Model convert(String ifc_filename, String uriBase) {
 		System.out.println("convert");
@@ -138,12 +149,11 @@ public class IFCtoLBDConverter_BIM4Ren {
 	}
 
 	public static void writeModel(Model m, String target_file) {
-		System.out.println("Write to: " + target_file);
-		FileOutputStream fo = null;
+		OutputStreamWriter fo = null;
 		try {
-			fo = new FileOutputStream(new File(target_file));
-			if (m == null)
-				System.err.println("Model is empty!!");
+			fo = new OutputStreamWriter(new FileOutputStream(new File(target_file)),
+					Charset.forName("UTF-8").newEncoder());
+
 			m.write(fo, "TTL");
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
@@ -202,70 +212,71 @@ public class IFCtoLBDConverter_BIM4Ren {
 							}
 						});
 
-				IfcOWLUtils.listStoreys(building, ifcOWL,this.lbd_general_output_model).stream().map(rn -> rn.asResource()).forEach(storey -> {
+				IfcOWLUtils.listStoreys(building, ifcOWL, this.lbd_general_output_model).stream()
+						.map(rn -> rn.asResource()).forEach(storey -> {
 
-					if (!RDFUtils.getType(storey.asResource()).get().getURI().endsWith("#IfcBuildingStorey")) {
-						System.err.println("No an #IfcBuildingStorey");
-						return;
-					}
+							if (!RDFUtils.getType(storey.asResource()).get().getURI().endsWith("#IfcBuildingStorey")) {
+								System.err.println("No an #IfcBuildingStorey");
+								return;
+							}
 
-					Resource so = createformattedURI(storey, lbd_general_output_model, "Storey");
-					String guid_storey = IfcOWLUtils.getGUID(storey, this.ifcOWL);
-					String uncompressed_guid_storey = GuidCompressor.uncompressGuidString(guid_storey);
+							Resource so = createformattedURI(storey, lbd_general_output_model, "Storey");
+							String guid_storey = IfcOWLUtils.getGUID(storey, this.ifcOWL);
+							String uncompressed_guid_storey = GuidCompressor.uncompressGuidString(guid_storey);
 
-					addAttrributes(lbd_general_output_model, storey, so);
+							addAttrributes(lbd_general_output_model, storey, so);
 
-					bo.addProperty(LBD_NS.BOT.hasStorey, so);
-					so.addProperty(RDF.type, LBD_NS.BOT.storey);
-					addBoundingBox(so, guid_storey);
+							bo.addProperty(LBD_NS.BOT.hasStorey, so);
+							addBoundingBox(so, guid_storey);
+							so.addProperty(RDF.type, LBD_NS.BOT.storey);
 
-					IfcOWLUtils.listPropertysets(storey, ifcOWL).stream().map(rn -> rn.asResource())
-							.forEach(propertyset -> {
-								PropertySet_SMLS p_set = this.propertysets.get(propertyset.getURI());
-								if (p_set != null)
-									p_set.connect(so, uncompressed_guid_storey);
-							});
+							IfcOWLUtils.listPropertysets(storey, ifcOWL).stream().map(rn -> rn.asResource())
+									.forEach(propertyset -> {
+										PropertySet_SMLS p_set = this.propertysets.get(propertyset.getURI());
+										if (p_set != null)
+											p_set.connect(so, uncompressed_guid_storey);
+									});
 
-					IfcOWLUtils.listContained_StoreyElements(storey, ifcOWL).stream().map(rn -> rn.asResource())
-							.forEach(element -> {
-								if (RDFUtils.getType(element.asResource()).get().getURI().endsWith("#IfcSpace"))
+							IfcOWLUtils.listContained_StoreyElements(storey, ifcOWL).stream().map(rn -> rn.asResource())
+									.forEach(element -> {
+										if (RDFUtils.getType(element.asResource()).get().getURI().endsWith("#IfcSpace"))
+											return;
+										connectElement(so, element);
+									});
+
+							IfcOWLUtils.listStoreySpaces(storey.asResource(), ifcOWL).stream().forEach(space -> {
+								if (!RDFUtils.getType(space.asResource()).get().getURI().endsWith("#IfcSpace"))
 									return;
-								connectElement(so, element);
+								System.out.println("Space: " + space.asResource().getURI());
+								Resource spo = createformattedURI(space.asResource(), lbd_general_output_model,
+										"Space");
+								String guid_space = IfcOWLUtils.getGUID(space.asResource(), this.ifcOWL);
+								String uncompressed_guid_space = GuidCompressor.uncompressGuidString(guid_space);
+								addAttrributes(lbd_general_output_model, space.asResource(), spo);
+
+								so.addProperty(LBD_NS.BOT.hasSpace, spo);
+								addBoundingBox(spo, guid_space);
+								spo.addProperty(RDF.type, LBD_NS.BOT.space);
+
+								IfcOWLUtils.listContained_SpaceElements(space.asResource(), ifcOWL).stream()
+										.map(rn -> rn.asResource()).forEach(element -> {
+											connectElement(spo, element);
+										});
+
+								IfcOWLUtils.listAdjacent_SpaceElements(space.asResource(), ifcOWL).stream()
+										.map(rn -> rn.asResource()).forEach(element -> {
+											connectElement(spo, LBD_NS.BOT.adjacentElement, element);
+										});
+
+								IfcOWLUtils.listPropertysets(space.asResource(), ifcOWL).stream()
+										.map(rn -> rn.asResource()).forEach(propertyset -> {
+											PropertySet_SMLS p_set = this.propertysets.get(propertyset.getURI());
+											if (p_set != null) {
+												p_set.connect(spo, uncompressed_guid_space);
+											}
+										});
 							});
-
-					IfcOWLUtils.listStoreySpaces(storey.asResource(), ifcOWL).stream().forEach(space -> {
-						if (!RDFUtils.getType(space.asResource()).get().getURI().endsWith("#IfcSpace"))
-							return;
-						System.out.println("Space: " + space.asResource().getURI());
-						Resource spo = createformattedURI(space.asResource(), lbd_general_output_model, "Space");
-						String guid_space = IfcOWLUtils.getGUID(space.asResource(), this.ifcOWL);
-						String uncompressed_guid_space = GuidCompressor.uncompressGuidString(guid_space);
-						addAttrributes(lbd_general_output_model, space.asResource(), spo);
-
-						so.addProperty(LBD_NS.BOT.hasSpace, spo);
-						spo.addProperty(RDF.type, LBD_NS.BOT.space);
-
-						addBoundingBox(spo, guid_space);
-
-						IfcOWLUtils.listContained_SpaceElements(space.asResource(), ifcOWL).stream()
-								.map(rn -> rn.asResource()).forEach(element -> {
-									connectElement(spo, element);
-								});
-
-						IfcOWLUtils.listAdjacent_SpaceElements(space.asResource(), ifcOWL).stream()
-								.map(rn -> rn.asResource()).forEach(element -> {
-									connectElement(spo, LBD_NS.BOT.adjacentElement, element);
-								});
-
-						IfcOWLUtils.listPropertysets(space.asResource(), ifcOWL).stream().map(rn -> rn.asResource())
-								.forEach(propertyset -> {
-									PropertySet_SMLS p_set = this.propertysets.get(propertyset.getURI());
-									if (p_set != null) {
-										p_set.connect(spo, uncompressed_guid_space);
-									}
-								});
-					});
-				});
+						});
 			});
 		});
 
@@ -333,7 +344,7 @@ public class IFCtoLBDConverter_BIM4Ren {
 
 				final List<RDFNode> propertyset_name = new ArrayList<>();
 				RDFUtils.pathQuery(propertyset, pname_path).forEach(name -> propertyset_name.add(name));
-				System.out.println("pset: "+propertyset);
+				System.out.println("pset: " + propertyset);
 				RDFStep[] path = { new RDFStep(ifcOWL.getHasProperties_IfcPropertySet()) };
 				RDFUtils.pathQuery(propertyset, path).forEach(propertySingleValue -> {
 
@@ -394,7 +405,7 @@ public class IFCtoLBDConverter_BIM4Ren {
 						ps.putPnameType(pname.toString(), ptype);
 					}
 
-					if (property_value.size() > 0) {						
+					if (property_value.size() > 0) {
 						RDFNode pvalue = property_value.get(0);
 						if (!pname.toString().equals(pvalue.toString())) {
 							if (pvalue.toString().trim().length() > 0) {
@@ -727,7 +738,7 @@ public class IFCtoLBDConverter_BIM4Ren {
 					continue;
 				Resource ifcowl_class = product_BE_ontology_statement.getObject().asResource();
 				Resource mapped_ifcowl_class = ontology_model
-						.getResource(this.ontURI.get() +  ifcowl_class.getLocalName());
+						.getResource(this.ontURI.get() + ifcowl_class.getLocalName());
 				StmtIterator subclass_statement_iterator = ontology_model
 						.listStatements(new SimpleSelector(null, RDFS.subClassOf, mapped_ifcowl_class));
 				while (subclass_statement_iterator.hasNext()) {
@@ -800,7 +811,6 @@ public class IFCtoLBDConverter_BIM4Ren {
 		return ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM);
 	}
 
-	
 	private File filterContent(File whole_content_file) {
 		File tempFile = null;
 		int state = 0;
@@ -818,49 +828,48 @@ public class IFCtoLBDConverter_BIM4Ren {
 							int len = trimmed.length();
 							if (len > 0) {
 								List<String> t;
-                                if(trimmed.endsWith(".")||trimmed.endsWith(";"))										
-										t=split(trimmed.substring(0, trimmed.length() - 1));
-                                else
-									t=split(trimmed.substring(0, trimmed.length()));
+								if (trimmed.endsWith(".") || trimmed.endsWith(";"))
+									t = split(trimmed.substring(0, trimmed.length() - 1));
+								else
+									t = split(trimmed.substring(0, trimmed.length()));
 								if (state == 0) {
 									for (int i = 0; i < t.size(); i++)
 										triple[i] = t.get(i);
-									
+
 									if (trimmed.endsWith("."))
 										state = 0;
 									else
-									  state = 1;
-									if (t.size() == 3)
-									{
-										StringBuffer sb=new StringBuffer();
+										state = 1;
+									if (t.size() == 3) {
+										StringBuffer sb = new StringBuffer();
 										sb.append(t.get(0));
 										sb.append(" ");
 										sb.append(t.get(1));
 										sb.append(" ");
 										sb.append(t.get(2));
 										sb.append(" .");
-										line =  sb.toString();
-									}
-									else
+										line = sb.toString();
+									} else
 										continue;
 								} else {
 									for (int i = 0; i < t.size(); i++)
 										triple[2 - i] = t.get(t.size() - 1 - i);
-									
-									StringBuffer sb=new StringBuffer();
+
+									StringBuffer sb = new StringBuffer();
 									sb.append(triple[0]);
 									sb.append(" ");
 									sb.append(triple[1]);
 									sb.append(" ");
 									sb.append(triple[2]);
 									sb.append(" .");
-									line =  sb.toString();
-									
+									line = sb.toString();
+
 									if (trimmed.endsWith("."))
 										state = 0;
 								}
 							}
 						}
+						line = new String(line.getBytes(), StandardCharsets.UTF_8);
 						if (line.contains("inst:IfcFace"))
 							continue;
 						if (line.contains("inst:IfcPolyLoop"))
@@ -941,21 +950,21 @@ public class IFCtoLBDConverter_BIM4Ren {
 		return ret;
 	}
 
-	
 	/**
 	 * 
 	 * Reads in a Turtle - Terse RDF Triple Language (TTL) formatted ontology file:
-	 * Turtle - Terse RDF Triple Language:  https://www.w3.org/TeamSubmission/turtle/
+	 * Turtle - Terse RDF Triple Language: https://www.w3.org/TeamSubmission/turtle/
 	 * 
-	 * The extra lines make sure that the files are found if run under Eclipse IDE or as a
-	 * runnable Java Archive file (JAR). 
+	 * The extra lines make sure that the files are found if run under Eclipse IDE
+	 * or as a runnable Java Archive file (JAR).
 	 * 
 	 * Eclipse: https://www.eclipse.org/
 	 * 
-	 * @param model  An Apache Jena model: RDF store run on memory. 
-	 * @param ontology_file An Apache Jena ontokigy model: RDF store run on memory containing an ontology engine. 
-	 * If no user interface is present, adding messages to the channel does nothing.
-
+	 * @param model         An Apache Jena model: RDF store run on memory.
+	 * @param ontology_file An Apache Jena ontokigy model: RDF store run on memory
+	 *                      containing an ontology engine. If no user interface is
+	 *                      present, adding messages to the channel does nothing.
+	 * 
 	 */
 	public static void readInOntologyTTL(Model model, String ontology_file) {
 
@@ -972,7 +981,7 @@ public class IFCtoLBDConverter_BIM4Ren {
 					return;
 				}
 			}
-			RDFDataMgr.read(model, in,Lang.TTL);
+			RDFDataMgr.read(model, in, Lang.TTL);
 			in.close();
 
 		} catch (Exception e) {
@@ -981,7 +990,7 @@ public class IFCtoLBDConverter_BIM4Ren {
 		}
 
 	}
-	
+
 	/**
 	 * This internal method reads in all the associated ontologies so that ontology
 	 * inference can ne used during the conversion.
